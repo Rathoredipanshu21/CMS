@@ -1,30 +1,68 @@
+<?php
+session_start();
+if (!isset($_SESSION['admin'])) {
+    header("Location: Login.php");
+    exit();
+}
+?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Stylish Admin Dashboard</title>
+    <title>Admin Dashboard</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-    <link href="https://unpkg.com/aos@2.3.1/dist/aos.css" rel="stylesheet">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
     <style>
-        body {
-            font-family: 'Poppins', sans-serif;
-            background-color: #f0f4f8; /* A very light, clean gray */
-            overflow: hidden; /* Prevent scrolling on the body */
+        :root {
+            --sidebar-bg: #111827; /* Dark Gray */
+            --sidebar-link-color: #9ca3af; /* Lighter Gray */
+            --sidebar-link-hover-bg: rgba(255, 255, 255, 0.05);
+            --sidebar-link-active-bg: #4f46e5; /* Indigo */
+            --main-bg: #f3f4f6; /* Light Gray */
+            --text-light: #ffffff;
         }
 
-        /* --- Stylish Sidebar --- */
-        .sidebar {
-            background: linear-gradient(180deg, rgba(35, 39, 65, 0.9), rgba(25, 28, 49, 0.95));
-            backdrop-filter: blur(15px);
-            -webkit-backdrop-filter: blur(15px);
-            border-right: 1px solid rgba(255, 255, 255, 0.1);
-            transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        body {
+            font-family: 'Poppins', sans-serif;
+            background-color: var(--main-bg);
         }
+
+        /* --- Stylish Scrollable Sidebar --- */
+        .sidebar {
+            background: var(--sidebar-bg);
+            transition: min-width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        /* Navigation container that will scroll */
+        .sidebar-nav {
+            flex-grow: 1;
+            overflow-y: auto;
+            overflow-x: hidden;
+        }
+
+        /* Custom Scrollbar Styling */
+        .sidebar-nav::-webkit-scrollbar {
+            width: 6px;
+        }
+        .sidebar-nav::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        .sidebar-nav::-webkit-scrollbar-thumb {
+            background-color: rgba(255, 255, 255, 0.2);
+            border-radius: 10px;
+        }
+        .sidebar-nav::-webkit-scrollbar-thumb:hover {
+            background-color: rgba(255, 255, 255, 0.4);
+        }
+
 
         .sidebar-header .logo-text {
             transition: opacity 0.3s ease-in-out;
@@ -34,25 +72,25 @@
             display: flex;
             align-items: center;
             padding: 0.85rem 1rem;
-            color: rgba(230, 230, 250, 0.7); /* Light lavender text */
+            color: var(--sidebar-link-color);
             font-weight: 500;
             border-radius: 0.5rem;
-            transition: all 0.3s ease;
-            margin: 0.5rem 0;
-            white-space: nowrap; /* Prevent text wrapping */
+            transition: all 0.2s ease;
+            margin: 0.25rem 0;
+            white-space: nowrap;
         }
 
         .sidebar-link:hover {
-            background-color: rgba(255, 255, 255, 0.1);
-            color: #ffffff;
-            transform: translateX(5px);
+            background-color: var(--sidebar-link-hover-bg);
+            color: var(--text-light);
+            transform: translateX(4px);
         }
 
         .sidebar-link.active {
-            background: linear-gradient(90deg, #4f46e5, #818cf8);
-            color: #ffffff;
+            background: var(--sidebar-link-active-bg);
+            color: var(--text-light);
             font-weight: 600;
-            box-shadow: 0 10px 20px -5px rgba(79, 70, 229, 0.4);
+            box-shadow: 0 4px 15px -3px rgba(79, 70, 229, 0.4);
         }
         
         .sidebar-link .link-text {
@@ -60,7 +98,7 @@
         }
 
         .sidebar-link i {
-            width: 2.5rem; /* Fixed width for icons */
+            width: 2.5rem;
             text-align: center;
             font-size: 1.1rem;
             transition: transform 0.3s ease;
@@ -72,31 +110,36 @@
 
         /* --- Collapsed Sidebar State --- */
         .sidebar.collapsed {
-            width: 5.5rem; /* Width for just icons */
+            min-width: 5.5rem;
+            width: 5.5rem;
         }
 
         .sidebar.collapsed .logo-text,
         .sidebar.collapsed .link-text,
         .sidebar.collapsed .sidebar-footer p {
             opacity: 0;
-            pointer-events: none; /* Make text un-interactable when hidden */
+            pointer-events: none;
         }
 
         .sidebar.collapsed .sidebar-header {
             justify-content: center;
         }
+        
+        .sidebar.collapsed .sidebar-link {
+            justify-content: center;
+        }
 
         /* --- Main Content Area --- */
-        main {
-            transition: margin-left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        #main-content-wrapper {
+            height: 100vh;
+            overflow-y: auto;
         }
         
-        /* --- Iframe --- */
         #content-frame {
             width: 100%;
             height: 100%;
             border: none;
-            border-radius: 1rem;
+            border-radius: 0.75rem;
             background-color: white;
             box-shadow: 0 8px 30px rgba(0, 0, 0, 0.05);
         }
@@ -112,83 +155,105 @@
             transition: all 0.3s ease;
         }
         .header-btn:hover {
-            transform: scale(1.1);
-            background-color: #4f46e5;
+            transform: translateY(-2px) scale(1.05);
+            background-color: var(--sidebar-link-active-bg);
             color: #fff;
+            box-shadow: 0 7px 20px rgba(79, 70, 229, 0.3);
         }
     </style>
 </head>
-<body class="flex h-screen">
+<body class="flex h-screen bg-gray-100">
 
-    <aside id="sidebar" class="sidebar w-64 flex-shrink-0 p-4 flex flex-col">
-        <div class="sidebar-header flex items-center justify-start py-4 mb-6" data-aos="fade-down">
+    <!-- Sidebar -->
+    <aside id="sidebar" class="sidebar w-64 min-w-[16rem] flex-shrink-0 p-4">
+        <!-- Sidebar Header -->
+        <div class="sidebar-header flex items-center justify-start py-4 mb-4 flex-shrink-0">
             <a href="#" class="flex items-center text-2xl font-bold text-white">
                 <i class="fas fa-rocket text-indigo-400 mr-3 text-3xl"></i>
-                <span class="logo-text">AdminPro</span>
+                <span class="logo-text">CMS - Admin</span>
             </a>
         </div>
 
-        <nav class="flex-grow">
-           <ul>
-    <li data-aos="fade-right" data-aos-delay="100">
-        <a href="Dashboard.php" class="sidebar-link active" target="content-frame">
-            <i class="fas fa-tachometer-alt"></i>
-            <span class="link-text">Dashboard</span>
-        </a>
-    </li>
-    <li data-aos="fade-right" data-aos-delay="200">
-        <a href="cash_demo.php" class="sidebar-link" target="content-frame">
-            <i class="fas fa-file-invoice-dollar"></i>
-            <span class="link-text">New Transaction</span>
-        </a>
-    </li>
-    <li data-aos="fade-right" data-aos-delay="300">
-        <a href="customer_add.php" class="sidebar-link" target="content-frame">
-            <i class="fas fa-user-plus"></i>
-            <span class="link-text">Add Customer</span>
-        </a>
-    </li>
-    <li data-aos="fade-right" data-aos-delay="400">
-        <a href="view_customers.php" class="sidebar-link" target="content-frame">
-            <i class="fas fa-users"></i>
-            <span class="link-text">Manage Customers</span>
-        </a>
-    </li>
-    <li data-aos="fade-right" data-aos-delay="500">
-        <a href="received_payments.php" class="sidebar-link" target="content-frame">
-            <i class="fas fa-history"></i>
-            <span class="link-text">Transaction History</span>
-        </a>
-    </li>
-    <li data-aos="fade-right" data-aos-delay="500">
-        <a href="company_commission.php" class="sidebar-link" target="content-frame">
-            <i class="fas fa-history"></i>
-            <span class="link-text">Company Commission</span>
-        </a>
-    </li>
-    <li data-aos="fade-right" data-aos-delay="600">
-        <a href="admin_cash_demo.php" class="sidebar-link" target="content-frame">
-            <i class="fas fa-sliders-h"></i>
-            <span class="link-text">Commission Settings</span>
-        </a>
-    </li>
-    <!-- <li data-aos="fade-right" data-aos-delay="600">
-        <a href="companies.php" class="sidebar-link" target="content-frame">
-            <i class="fas fa-sliders-h"></i>
-            <span class="link-text">Companies</span>
-        </a>
-    </li> -->
-</ul>
-
+        <!-- Scrollable Navigation -->
+        <nav class="sidebar-nav">
+            <ul>
+                <li>
+                    <a href="Dashboard.php" class="sidebar-link active" target="content-frame">
+                        <i class="fas fa-tachometer-alt"></i><span class="link-text">Dashboard</span>
+                    </a>
+                </li>
+                <li>
+                    <a href="customer_add.php" class="sidebar-link" target="content-frame">
+                        <i class="fas fa-user-plus"></i><span class="link-text">Add New Customer</span>
+                    </a>
+                </li>
+                <li>
+                    <a href="view_customers.php" class="sidebar-link" target="content-frame">
+                        <i class="fas fa-users"></i><span class="link-text">Manage Customers</span>
+                    </a>
+                </li>
+                <li>
+                    <a href="cash_demo.php" class="sidebar-link" target="content-frame">
+                        <i class="fas fa-money-bill-transfer"></i><span class="link-text">New Transaction</span>
+                    </a>
+                </li>
+                <li>
+                    <a href="received_payments.php" class="sidebar-link" target="content-frame">
+                        <i class="fas fa-history"></i><span class="link-text">Transaction History</span>
+                    </a>
+                </li>
+                <li>
+                    <a href="company_commission.php" class="sidebar-link" target="content-frame">
+                        <i class="fas fa-hand-holding-usd"></i><span class="link-text">Company commission</span>
+                    </a>
+                </li>
+                <li>
+                    <a href="create_branch.php" class="sidebar-link" target="content-frame">
+                        <i class="fas fa-plus"></i><span class="link-text">Create Branch</span>
+                    </a>
+                </li>
+                <li>
+                    <a href="add_bank.php" class="sidebar-link" target="content-frame">
+                        <i class="fas fa-university"></i><span class="link-text">Manage Banks</span>
+                    </a>
+                </li>
+                <li>
+                    <a href="bank_transactions.php" class="sidebar-link" target="content-frame">
+                        <i class="fas fa-exchange-alt"></i><span class="link-text">Bank Transactions</span>
+                    </a>
+                </li>
+                <li>
+                    <a href="bank_deposits.php" class="sidebar-link" target="content-frame">
+                        <i class="fas fa-piggy-bank"></i><span class="link-text">Bank Deposits</span>
+                    </a>
+                </li>
+                <li>
+                    <a href="manage_pages.php" class="sidebar-link" target="content-frame">
+                        <i class="fas fa-file-alt"></i><span class="link-text">Manage Branch Pages</span>
+                    </a>
+                </li>
+                <li>
+                    <a href="customer_search.php" class="sidebar-link" target="content-frame">
+                        <i class="fas fa-search"></i><span class="link-text">Customer Lookup</span>
+                    </a>
+                </li>
+                 <li>
+                    <a href="logout.php" class="sidebar-link bg-red-500 hover:bg-red-600 text-white font-bold">
+                        <i class="fas fa-sign-out-alt"></i><span class="link-text">Log Out</span>
+                    </a>
+                </li>
+            </ul>
         </nav>
 
-        <div class="sidebar-footer mt-auto text-center text-gray-400 text-xs" data-aos="fade-up" data-aos-delay="600">
+        <!-- Sidebar Footer -->
+        <div class="sidebar-footer mt-auto text-center text-gray-400 text-xs flex-shrink-0 pt-4">
             <p>&copy; <?php echo date("Y"); ?> Your Company</p>
         </div>
     </aside>
 
-    <div id="main-content" class="flex-1 flex flex-col">
-        <header class="p-4 flex items-center space-x-3">
+    <!-- Main Content -->
+    <div id="main-content-wrapper" class="flex-1 flex flex-col">
+        <header class="p-4 flex items-center space-x-3 bg-gray-100/80 backdrop-blur-sm sticky top-0 z-10">
              <button id="menu-toggle" class="header-btn flex items-center justify-center">
                 <i class="fas fa-bars"></i>
             </button>
@@ -197,23 +262,14 @@
             </button>
         </header>
 
-        <main class="flex-1 p-6 pt-0">
-             <div class="h-full" data-aos="fade-up" data-aos-duration="800">
+        <main class="flex-1 p-6 pt-2">
+             <div class="h-full">
                 <iframe id="content-frame" name="content-frame" src="Dashboard.php"></iframe>
             </div>
         </main>
     </div>
 
-
-    <script src="https://unpkg.com/aos@2.3.1/dist/aos.js"></script>
     <script>
-        // Initialize AOS
-        AOS.init({
-            duration: 600,
-            once: true,
-            easing: 'ease-in-out-quad',
-        });
-
         // --- DOM Elements ---
         const sidebar = document.getElementById('sidebar');
         const menuToggle = document.getElementById('menu-toggle');
@@ -229,6 +285,9 @@
         // --- Active Link Handling ---
         links.forEach(link => {
             link.addEventListener('click', function() {
+                // Do not remove active class from the logout button
+                if(this.href.includes('logout.php')) return;
+
                 links.forEach(l => l.classList.remove('active'));
                 this.classList.add('active');
             });

@@ -1,5 +1,5 @@
 <?php
-include 'config/db.php'; // Ensure you have your database connection here
+include '../config/db.php'; // Ensure you have your database connection here
 
 // Fetch current commission percentage
 $sql = "SELECT * FROM settings WHERE setting_key = 'commission_percentage' LIMIT 1";

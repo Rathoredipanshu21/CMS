@@ -1,20 +1,11 @@
 <?php
-// It's good practice to have a secure way to check if the user is an admin.
-// For now, we'll proceed, but in a real application, you'd have an admin login system.
-// session_start();
-// if (!isset($_SESSION['is_admin']) || $_SESSION['is_admin'] !== true) {
-//     header("Location: admin_login.php");
-//     exit();
-// }
 
-include '../config/db.php'; // Ensure this path is correct
+include '../config/db.php'; 
 
 $message = '';
 $error = '';
 
-// --- Handle POST Requests for Add, Update, and Delete ---
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
-    // --- ADD A NEW COMMISSION ---
     if (isset($_POST['add_commission'])) {
         $company_name = trim($_POST['company_name']);
         $commission_percentage = $_POST['commission_percentage'];
@@ -41,7 +32,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         }
     }
 
-    // --- UPDATE AN EXISTING COMMISSION ---
     if (isset($_POST['update_commission'])) {
         $id = intval($_POST['edit_id']);
         $company_name = trim($_POST['edit_company_name']);

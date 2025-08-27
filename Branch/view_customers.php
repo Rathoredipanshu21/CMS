@@ -119,8 +119,8 @@ if (isset($_REQUEST['action'])) {
 
 
 // --- INITIAL PAGE LOAD: FETCH ALL CUSTOMERS FOR THE TABLE ---
-// Updated SQL to fetch the new columns
-$sql = "SELECT c.id, c.customer_uid, c.name, c.mobile_no, c.photo_path, c.created_at FROM customers c ORDER BY c.id ASC";
+// Updated SQL to fetch the new columns and show latest first
+$sql = "SELECT c.id, c.customer_uid, c.name, c.mobile_no, c.photo_path, c.created_at FROM customers c ORDER BY c.id DESC";
 $result = $conn->query($sql);
 $customers = [];
 if ($result && $result->num_rows > 0) {
@@ -267,8 +267,8 @@ $conn->close();
                             <td>
                                 <?php 
                                     $photo_path = !empty($customer['photo_path']) && file_exists_check($customer['photo_path']) 
-                                                  ? $customer['photo_path'] 
-                                                  : 'https://placehold.co/100x100/EBF4FF/7F9CF5?text=N/A';
+                                                    ? $customer['photo_path'] 
+                                                    : 'https://placehold.co/100x100/EBF4FF/7F9CF5?text=N/A';
                                 ?>
                                 <img src="<?php echo htmlspecialchars($photo_path); ?>" alt="Profile" class="profile-pic">
                             </td>
@@ -279,8 +279,6 @@ $conn->close();
                             <td>
                                 <div class="actions-cell">
                                     <button class="btn btn-view" data-id="<?php echo $customer['id']; ?>"><i class="fas fa-eye"></i> View</button>
-                                    <button class="btn btn-edit" data-id="<?php echo $customer['id']; ?>" data-name="<?php echo htmlspecialchars($customer['name']); ?>" data-mobile="<?php echo htmlspecialchars($customer['mobile_no']); ?>"><i class="fas fa-pencil-alt"></i> Edit</button>
-                                    <button class="btn btn-delete" data-id="<?php echo $customer['id']; ?>"><i class="fas fa-trash-alt"></i> Delete</button>
                                 </div>
                             </td>
                         </tr>
@@ -295,7 +293,6 @@ $conn->close();
     </div>
 </div>
 
-<!-- View Modal -->
 <div id="viewModal" class="modal">
     <div class="modal-content">
         <div class="modal-header">
@@ -303,12 +300,10 @@ $conn->close();
             <span class="close-btn">&times;</span>
         </div>
         <div id="viewModalContent">
-            <!-- Content will be loaded via AJAX -->
-        </div>
+            </div>
     </div>
 </div>
 
-<!-- Edit Modal -->
 <div id="editModal" class="modal">
     <div class="modal-content">
          <div class="modal-header">

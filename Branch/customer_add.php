@@ -1,42 +1,75 @@
 <?php
+session_start(); // Start the session to access logged-in user data
+
+// --- Security Check: Ensure user is logged in ---
+if (!isset($_SESSION['branch_user']) || !isset($_SESSION['branch_id'])) {
+    // If not logged in, stop execution and show an error.
+    die("Access Denied. You must be logged in to perform this action.");
+}
 
 $message = '';
 $error = '';
-$display_uid = ''; // Variable to hold the new unique ID for display
+$display_uid = ''; 
 $companies = [];
 
-// --- Fetch Companies for Dropdown ---
-include '../config/db.php'; // Ensure this path is correct
-if ($conn->connect_error) {
-    // Can't proceed if we can't get company list
-    $error = "Database connection failed: " . $conn->connect_error;
-} else {
+// --- Database Connection ---
+include '../config/db.php'; 
+
+// --- CORRECTED: Fetch Logged-in User's Branch Name AND Username from DB ---
+$branch_name_from_db = 'N/A';
+$username_from_db = 'N/A'; // Variable to hold the username from the database
+
+if ($conn) {
+    // Prepare a single query to get both branch_name and username
+    $stmt_branch = $conn->prepare("SELECT branch_name, username FROM branch WHERE id = ?");
+    if ($stmt_branch) {
+        $stmt_branch->bind_param("i", $_SESSION['branch_id']);
+        $stmt_branch->execute();
+        $result_branch = $stmt_branch->get_result();
+        if ($row_branch = $result_branch->fetch_assoc()) {
+            $branch_name_from_db = $row_branch['branch_name'];
+            $username_from_db = $row_branch['username']; // Store the username
+        }
+        $stmt_branch->close();
+    }
+}
+
+// Fetch Companies for Dropdown
+if ($conn && !$conn->connect_error) {
     $company_result = $conn->query("SELECT id, company_name FROM company_commissions ORDER BY company_name ASC");
     if ($company_result && $company_result->num_rows > 0) {
         while($row = $company_result->fetch_assoc()) {
             $companies[] = $row;
         }
     }
-    // Don't close the connection here if the main script needs it
+} else {
+    $error = "Database connection failed: " . ($conn ? $conn->connect_error : "Connection object is null");
 }
 
-
+// --- Form Submission Logic ---
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
-    // The include is already there, but let's ensure connection is still valid
-    // This part of the logic remains largely the same
     if (!$conn || $conn->connect_error) {
         $error = "Database connection has been lost.";
     } else {
+        // --- Use the variables fetched from the database ---
+        $created_by_branch = $branch_name_from_db;
+        $created_by_user = $username_from_db;
+
         $conn->begin_transaction();
 
         try {
-            // --- Generate New Unique Customer ID (DBCE-CMS-XXX) ---
+            // --- Define File Size and Type Limits ---
+            define('MAX_IMAGE_SIZE', 400 * 1024); // 400 KB
+            define('MAX_PDF_SIZE', 400 * 1024);   // 400 KB
+            $allowed_image_types = ['jpg', 'jpeg', 'png'];
+            $allowed_doc_types = ['pdf'];
+
+            // --- Generate New Unique Customer ID ---
             $result = $conn->query("SELECT customer_uid FROM customers ORDER BY id DESC LIMIT 1");
-            $last_uid = 'DBCE-CMS-000'; // Default if no customers exist
+            $last_uid = 'DBCE-CMS-000';
             if ($result && $result->num_rows > 0) {
                 $last_uid = $result->fetch_assoc()['customer_uid'];
             }
-
             $numeric_part = (int) substr($last_uid, -3);
             $new_numeric_part = $numeric_part + 1;
             $customer_uid = 'DBCE-CMS-' . str_pad($new_numeric_part, 3, '0', STR_PAD_LEFT);
@@ -48,90 +81,81 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             }
 
             // --- Insert into `customers` table ---
-            $stmt_customer = $conn->prepare("INSERT INTO customers (customer_uid, name, father_name, email, mobile_no, company_name, employee_id, photo_path) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
+            $stmt_customer = $conn->prepare(
+                "INSERT INTO customers (customer_uid, name, father_name, email, mobile_no, company_name, employee_id, photo_path, created_by_branch, created_by_user) 
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+            );
             
             if ($stmt_customer === false) {
-                throw new Exception("Failed to prepare the customer insert statement. Please ensure the 'customers' table has a 'customer_uid' column. DB Error: " . $conn->error);
+                throw new Exception("Failed to prepare the customer insert statement. DB Error: " . $conn->error);
             }
 
-            // Initialize variables from POST data
             $name = $_POST['name'];
             $father_name = $_POST['father_name'];
             $email = $_POST['email'];
-            $company_name = $_POST['company_name']; // This will now come from the dropdown
+            $company_name = $_POST['company_name'];
             $employee_id = $_POST['employee_id'];
-            $photo_path = ''; // Will be updated after file move
+            $photo_path = '';
 
-            // Handle Profile Photo Upload
+            // --- Handle Profile Photo Upload with Validation ---
             if (isset($_FILES['photo']) && $_FILES['photo']['error'] == 0) {
-                $target_dir = "uploads/profiles/";
+                if ($_FILES['photo']['size'] > MAX_IMAGE_SIZE) {
+                    throw new Exception("Profile photo size cannot exceed 400KB.");
+                }
+                $target_dir = "../Admin/uploads/profiles/";
                 if (!is_dir($target_dir)) mkdir($target_dir, 0755, true);
-                
-                $file_extension = pathinfo($_FILES["photo"]["name"], PATHINFO_EXTENSION);
-                $target_file = $target_dir . uniqid('profile_', true) . '.' . strtolower($file_extension);
-                $allowed_types = ['jpg', 'jpeg', 'png', 'gif'];
-
-                if (in_array(strtolower($file_extension), $allowed_types)) {
-                    if (move_uploaded_file($_FILES["photo"]["tmp_name"], $target_file)) {
-                        $photo_path = $target_file;
-                    } else {
-                        throw new Exception("Sorry, there was an error uploading your profile photo.");
-                    }
+                $file_extension = strtolower(pathinfo($_FILES["photo"]["name"], PATHINFO_EXTENSION));
+                if (!in_array($file_extension, $allowed_image_types)) {
+                    throw new Exception("Invalid file type for profile photo. Only JPG, JPEG, & PNG are allowed.");
+                }
+                $target_file = $target_dir . uniqid('profile_', true) . '.' . $file_extension;
+                if (move_uploaded_file($_FILES["photo"]["tmp_name"], $target_file)) {
+                    $photo_path = $target_file;
                 } else {
-                    throw new Exception("Sorry, only JPG, JPEG, PNG & GIF files are allowed for the profile photo.");
+                    throw new Exception("Sorry, there was an error uploading your profile photo.");
                 }
             }
 
-            $stmt_customer->bind_param("ssssssss", $customer_uid, $name, $father_name, $email, $mobile_no, $company_name, $employee_id, $photo_path);
+            $stmt_customer->bind_param("ssssssssss", $customer_uid, $name, $father_name, $email, $mobile_no, $company_name, $employee_id, $photo_path, $created_by_branch, $created_by_user);
             if (!$stmt_customer->execute()) {
-                if ($conn->errno == 1062) {
-                     throw new Exception("A customer with a similar unique ID already exists. Please try submitting again.");
-                }
                 throw new Exception("Error creating customer record: " . $stmt_customer->error);
             }
-
             $customer_id = $conn->insert_id;
             $stmt_customer->close();
 
-            // --- Handle Multiple Document Uploads ---
+            // --- Handle Multiple Document Uploads with Validation ---
             if (isset($_POST['document_type']) && is_array($_POST['document_type'])) {
                 $doc_files = $_FILES['document_image'];
                 $doc_types = $_POST['document_type'];
                 $doc_numbers = $_POST['document_number'];
-                $doc_target_dir = "uploads/documents/";
+                $doc_target_dir = "../Admin/uploads/documents/";
                 if (!is_dir($doc_target_dir)) mkdir($doc_target_dir, 0755, true);
 
                 foreach ($doc_types as $key => $type) {
                     if (!empty($type)) {
                         $number = $doc_numbers[$key];
                         if (empty($number) || !isset($doc_files['name'][$key]) || $doc_files['error'][$key] !== UPLOAD_ERR_OK) {
-                            throw new Exception("For each selected document type, you must provide a document number and upload an image file.");
+                            throw new Exception("For each document, you must provide a type, number, and upload a file.");
                         }
-
+                        if ($doc_files['size'][$key] > MAX_PDF_SIZE) {
+                            throw new Exception("Document '" . htmlspecialchars($type) . "' size cannot exceed 400KB.");
+                        }
+                        $file_ext = strtolower(pathinfo($doc_files['name'][$key], PATHINFO_EXTENSION));
+                        if (!in_array($file_ext, $allowed_doc_types)) {
+                             throw new Exception("Invalid file type for document '" . htmlspecialchars($type) . "'. Only PDF files are allowed.");
+                        }
                         if ($type === 'Aadhaar Card' && !preg_match('/^\d{12}$/', $number)) throw new Exception("Invalid Aadhaar number format.");
                         if ($type === 'PAN Card' && !preg_match('/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/', $number)) throw new Exception("Invalid PAN Card format.");
 
-                        $file_name = $doc_files['name'][$key];
-                        $file_tmp = $doc_files['tmp_name'][$key];
-                        $file_ext = pathinfo($file_name, PATHINFO_EXTENSION);
-                        $doc_target_file = $doc_target_dir . uniqid('doc_' . $customer_id . '_', true) . '.' . strtolower($file_ext);
-                        
-                        if (!in_array(strtolower($file_ext), ['jpg', 'jpeg', 'png', 'pdf'])) {
-                             throw new Exception("Sorry, only JPG, JPEG, PNG & PDF files are allowed for documents.");
-                        }
-
-                        if (!move_uploaded_file($file_tmp, $doc_target_file)) {
+                        $doc_target_file = $doc_target_dir . uniqid('doc_' . $customer_id . '_', true) . '.' . $file_ext;
+                        if (!move_uploaded_file($doc_files['tmp_name'][$key], $doc_target_file)) {
                             throw new Exception("Failed to upload document file for " . htmlspecialchars($type));
                         }
-
                         $stmt_doc = $conn->prepare("INSERT INTO customer_documents (customer_id, document_type, document_number, document_image_path) VALUES (?, ?, ?, ?)");
-                        
                         if ($stmt_doc === false) {
-                            throw new Exception("Failed to prepare the document insert statement. Check table/column names. DB Error: " . $conn->error);
+                            throw new Exception("Failed to prepare document insert statement. DB Error: " . $conn->error);
                         }
-
                         $stmt_doc->bind_param("isss", $customer_id, $type, $number, $doc_target_file);
-                        
                         if (!$stmt_doc->execute()) {
                             throw new Exception("Error saving document record: " . $stmt_doc->error);
                         }
@@ -161,10 +185,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     <title>Customer Entry Form</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-
     <style>
         body { font-family: 'Inter', sans-serif; background-color: #f0f2f5; }
         .form-container { background-color: white; border-radius: 12px; box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1); overflow: hidden; }
@@ -176,19 +197,13 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         .form-select { padding-right: 40px; background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e"); background-position: right 0.75rem center; background-repeat: no-repeat; background-size: 1.5em 1.5em; }
         .form-input-file { padding: 8px 12px; }
         .form-input:focus, .form-select:focus { outline: none; border-color: #4a90e2; box-shadow: 0 0 0 3px rgba(74, 144, 226, 0.2); }
-        .form-input:invalid { border-color: #ef4444; }
         .form-input[readonly] { background-color: #f3f4f6; cursor: not-allowed; }
-        .required-star { color: #ef4444; font-weight: bold; }
         .btn { padding: 12px 24px; border-radius: 8px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; transition: all 0.3s ease; border: none; cursor: pointer; color: white; box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1); display: inline-flex; align-items: center; justify-content: center; }
         .btn-submit { background-color: #22c55e; } .btn-submit:hover { background-color: #16a34a; transform: translateY(-2px); }
-        .btn-clear { background-color: #3b82f6; } .btn-clear:hover { background-color: #2563eb; transform: translateY(-2px); }
-        .btn-cancel { background-color: #ef4444; } .btn-cancel:hover { background-color: #dc2626; transform: translateY(-2px); }
         .btn-add { background-color: #6366f1; padding: 10px 20px; } .btn-add:hover { background-color: #4f46e5; transform: translateY(-2px); }
         .btn-remove { background-color: #f43f5e; color: white; border-radius: 50%; width: 32px; height: 32px; font-size: 14px; } .btn-remove:hover { background-color: #e11d48; }
-        .document-entry { background-color: #fafafa; border: 1px solid #e5e7eb; border-radius: 8px; }
         #photo-preview-container { width: 150px; height: 150px; border-radius: 50%; border: 4px solid #e5e7eb; overflow: hidden; margin: 1rem auto; background-color: #f9fafb; display: none; }
         #photo-preview { width: 100%; height: 100%; object-fit: cover; }
-        #camera-modal { display: none; }
     </style>
 </head>
 <body>
@@ -220,15 +235,15 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                     </div>
                     
                     <div>
-                        <label for="name" class="block text-gray-700 font-medium mb-2">Name <span class="required-star">*</span></label>
+                        <label for="name" class="block text-gray-700 font-medium mb-2">Name <span class="text-red-500 font-bold">*</span></label>
                         <div class="form-input-group"><i class="fas fa-user form-input-icon"></i><input type="text" id="name" name="name" class="form-input" placeholder="Enter full Name" required></div>
                     </div>
                     <div>
-                        <label for="mobile_no" class="block text-gray-700 font-medium mb-2">Mobile No <span class="required-star">*</span></label>
+                        <label for="mobile_no" class="block text-gray-700 font-medium mb-2">Mobile No <span class="text-red-500 font-bold">*</span></label>
                         <div class="form-input-group">
-    <i class="fas fa-mobile-alt form-input-icon"></i>
-    <input type="tel" id="mobile_no" name="mobile_no" class="form-input" placeholder="Enter 10-digit number" required pattern="[0-9]{10}" maxlength="10" title="Mobile number must be exactly 10 digits.">
-</div>
+                            <i class="fas fa-mobile-alt form-input-icon"></i>
+                            <input type="tel" id="mobile_no" name="mobile_no" class="form-input" placeholder="Enter 10-digit number" required pattern="[0-9]{10}" maxlength="10" title="Mobile number must be exactly 10 digits.">
+                        </div>
                     </div>
                     <div>
                         <label for="father_name" class="block text-gray-700 font-medium mb-2">Father's Name</label>
@@ -262,16 +277,13 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                 <div class="mt-6">
                     <label class="block text-gray-700 font-medium mb-2">Upload Profile Photo (Optional)</label>
                     <div id="photo-preview-container"><img id="photo-preview" src="#" alt="Photo Preview"/></div>
-                    <div class="flex items-center justify-center space-x-4 mt-2">
-                        <label for="photo" class="btn btn-clear cursor-pointer">
+                    <div class="flex items-center justify-center mt-2">
+                        <label for="photo" class="btn bg-blue-500 hover:bg-blue-600 cursor-pointer">
                             <i class="fas fa-upload mr-2"></i> Upload File
                         </label>
-                        <input id="photo" name="photo" type="file" class="hidden" accept="image/png, image/jpeg, image/gif">
-                        <button type="button" id="start-camera-btn" class="btn btn-add">
-                            <i class="fas fa-camera mr-2"></i> Use Camera
-                        </button>
+                        <input id="photo" name="photo" type="file" class="hidden" accept="image/png, image/jpeg, image/jpg">
                     </div>
-                    <p class="text-center text-xs text-gray-500 mt-2">PNG, JPG, GIF up to 10MB</p>
+                    <p class="text-center text-xs text-gray-500 mt-2">PNG, JPG, JPEG up to 400KB</p>
                 </div>
 
                 <div class="mt-10 pt-6 border-t">
@@ -281,29 +293,12 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                     </div>
                     <div id="documents-container" class="space-y-6"></div>
                 </div>
-
-                <div class="mt-8 border-t pt-6">
-                    <p class="text-sm text-gray-600">I hereby declare that the information given above is true to the best of my knowledge.</p>
-                </div>
                 
-                <div class="mt-8 flex justify-end space-x-4">
+                <div class="mt-8 flex justify-end space-x-4 border-t pt-6">
                     <button type="submit" class="btn btn-submit"><i class="fas fa-check mr-2"></i>Submit</button>
-                    <button type="reset" class="btn btn-clear"><i class="fas fa-undo mr-2"></i>Clear Form</button>
-                    <button type="button" class="btn btn-cancel" onclick="window.history.back()"><i class="fas fa-times mr-2"></i>Cancel</button>
+                    <button type="button" class="btn bg-red-500 hover:bg-red-600" onclick="window.history.back()"><i class="fas fa-times mr-2"></i>Cancel</button>
                 </div>
             </form>
-        </div>
-    </div>
-
-    <div id="camera-modal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center p-4">
-        <div class="bg-white rounded-lg shadow-xl p-6 w-full max-w-2xl text-center">
-            <h3 class="text-lg font-medium leading-6 text-gray-900 mb-4">Live Camera Feed</h3>
-            <video id="camera-feed" class="w-full rounded-md border" autoplay playsinline></video>
-            <canvas id="camera-canvas" class="hidden"></canvas>
-            <div class="mt-4 flex justify-center space-x-4">
-                <button type="button" id="capture-btn" class="btn btn-submit"><i class="fas fa-camera-retro mr-2"></i>Capture Photo</button>
-                <button type="button" id="close-camera-btn" class="btn btn-cancel"><i class="fas fa-times mr-2"></i>Close</button>
-            </div>
         </div>
     </div>
 
@@ -311,12 +306,13 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 document.addEventListener('DOMContentLoaded', function () {
     const addDocumentBtn = document.getElementById('add-document-btn');
     const documentsContainer = document.getElementById('documents-container');
+    const photoInput = document.getElementById('photo');
+    const photoPreviewContainer = document.getElementById('photo-preview-container');
+    const photoPreview = document.getElementById('photo-preview');
 
     addDocumentBtn.addEventListener('click', function () {
-        const uniqueId = 'doc-entry-' + Date.now();
         const docEntry = document.createElement('div');
-        docEntry.className = 'document-entry p-4 grid grid-cols-1 md:grid-cols-3 gap-4 items-center relative';
-        docEntry.id = uniqueId;
+        docEntry.className = 'document-entry p-4 grid grid-cols-1 md:grid-cols-3 gap-4 items-center relative bg-gray-50 border rounded-lg';
         docEntry.innerHTML = `
             <div>
                 <label class="block text-sm font-medium text-gray-700 mb-1">Document Type</label>
@@ -335,9 +331,10 @@ document.addEventListener('DOMContentLoaded', function () {
                 <input type="text" name="document_number[]" class="form-input w-full document-number-input" placeholder="Select type first" required disabled>
             </div>
             <div class="flex items-end h-full">
-                <input type="file" name="document_image[]" class="form-input form-input-file w-full" required>
+                <input type="file" name="document_image[]" class="form-input form-input-file w-full" required accept="application/pdf">
                 <button type="button" class="btn btn-remove ml-2 flex-shrink-0"><i class="fas fa-trash-alt"></i></button>
             </div>
+            <p class="md:col-span-3 text-center text-xs text-gray-500 mt-1">PDF file only, up to 400KB.</p>
         `;
         documentsContainer.appendChild(docEntry);
     });
@@ -348,15 +345,14 @@ document.addEventListener('DOMContentLoaded', function () {
             const docEntry = e.target.closest('.document-entry');
             const numberInput = docEntry.querySelector('.document-number-input');
 
-            numberInput.disabled = true;
+            numberInput.disabled = !selectedType;
             numberInput.value = '';
             numberInput.removeAttribute('pattern');
             numberInput.removeAttribute('maxlength');
-            numberInput.removeAttribute('title');
-            numberInput.placeholder = 'Select type first';
+            numberInput.title = '';
+            numberInput.placeholder = selectedType ? 'Enter number' : 'Select type first';
 
             if (selectedType) {
-                numberInput.disabled = false;
                 switch (selectedType) {
                     case 'Aadhaar Card':
                         numberInput.pattern = "\\d{12}";
@@ -370,28 +366,6 @@ document.addEventListener('DOMContentLoaded', function () {
                         numberInput.title = "Format: ABCDE1234F";
                         numberInput.placeholder = "Enter 10-character PAN";
                         break;
-                    case 'Voter ID':
-                        numberInput.pattern = "[A-Z0-9]{10}";
-                        numberInput.maxLength = 10;
-                        numberInput.title = "Must be 10 alphanumeric characters.";
-                        numberInput.placeholder = "Enter 10-character Voter ID";
-                        break;
-                    case 'Driving License':
-                        numberInput.maxLength = 16;
-                        numberInput.title = "Up to 16 characters allowed.";
-                        numberInput.placeholder = "Enter Driving License No.";
-                        break;
-                    case 'Passport':
-                        numberInput.pattern = "[A-PR-WYa-pr-wy][1-9]\\d{6}";
-                        numberInput.maxLength = 8;
-                        numberInput.title = "Format: A1234567";
-                        numberInput.placeholder = "Enter 8-character Passport No.";
-                        break;
-                    case 'Ration Card':
-                         numberInput.maxLength = 20;
-                         numberInput.title = "Up to 20 characters allowed.";
-                         numberInput.placeholder = "Enter Ration Card No.";
-                         break;
                 }
             }
         }
@@ -402,29 +376,21 @@ document.addEventListener('DOMContentLoaded', function () {
             e.target.closest('.document-entry').remove();
         }
     });
-    
-    document.getElementById('customerForm').addEventListener('reset', function() {
-        documentsContainer.innerHTML = '';
-        photoPreviewContainer.style.display = 'none';
-        photoPreview.src = '#';
-        if (window.cameraStream) {
-            window.cameraStream.getTracks().forEach(track => track.stop());
-        }
-    });
-
-    const photoInput = document.getElementById('photo');
-    const photoPreviewContainer = document.getElementById('photo-preview-container');
-    const photoPreview = document.getElementById('photo-preview');
-    const startCameraBtn = document.getElementById('start-camera-btn');
-    const cameraModal = document.getElementById('camera-modal');
-    const cameraFeed = document.getElementById('camera-feed');
-    const cameraCanvas = document.getElementById('camera-canvas');
-    const captureBtn = document.getElementById('capture-btn');
-    const closeCameraBtn = document.getElementById('close-camera-btn');
 
     photoInput.addEventListener('change', function(event) {
         const file = event.target.files[0];
         if (file) {
+            if (file.size > 400 * 1024) {
+                alert('Error: Profile photo cannot exceed 400KB.');
+                event.target.value = '';
+                return;
+            }
+            if (!['image/jpeg', 'image/png', 'image/jpg'].includes(file.type)) {
+                 alert('Error: Please select a JPG or PNG image.');
+                 event.target.value = '';
+                 return;
+            }
+
             const reader = new FileReader();
             reader.onload = function(e) {
                 photoPreview.src = e.target.result;
@@ -432,42 +398,6 @@ document.addEventListener('DOMContentLoaded', function () {
             }
             reader.readAsDataURL(file);
         }
-    });
-
-    startCameraBtn.addEventListener('click', async () => {
-        cameraModal.style.display = 'flex';
-        try {
-            window.cameraStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
-            cameraFeed.srcObject = window.cameraStream;
-        } catch (err) {
-            console.error("Error accessing camera:", err);
-            alert("Could not access the camera. Please check permissions and ensure your device has a camera.");
-            cameraModal.style.display = 'none';
-        }
-    });
-
-    const closeCamera = () => {
-        cameraModal.style.display = 'none';
-        if (window.cameraStream) {
-            window.cameraStream.getTracks().forEach(track => track.stop());
-        }
-    };
-    closeCameraBtn.addEventListener('click', closeCamera);
-
-    captureBtn.addEventListener('click', () => {
-        cameraCanvas.width = cameraFeed.videoWidth;
-        cameraCanvas.height = cameraFeed.videoHeight;
-        const context = cameraCanvas.getContext('2d');
-        context.drawImage(cameraFeed, 0, 0, cameraCanvas.width, cameraCanvas.height);
-        photoPreview.src = cameraCanvas.toDataURL('image/jpeg');
-        photoPreviewContainer.style.display = 'block';
-        cameraCanvas.toBlob(function(blob) {
-            const file = new File([blob], "camera-photo.jpg", { type: "image/jpeg" });
-            const dataTransfer = new DataTransfer();
-            dataTransfer.items.add(file);
-            photoInput.files = dataTransfer.files;
-        }, 'image/jpeg');
-        closeCamera();
     });
 });
 </script>
