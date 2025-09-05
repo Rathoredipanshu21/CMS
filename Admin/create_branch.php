@@ -88,7 +88,7 @@ $total_branches = $result->num_rows;
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Manage Branches</title>
+    <title>Manage Employees</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- AOS Animation Library -->
@@ -102,8 +102,8 @@ $total_branches = $result->num_rows;
         <!-- Header Section -->
         <div class="flex justify-between items-center mb-8" data-aos="fade-down">
             <div>
-                <h1 class="text-3xl font-bold text-gray-800">Manage Branches</h1>
-                <p class="text-gray-500">Total Branches: <span class="font-semibold text-blue-600"><?php echo $total_branches; ?></span></p>
+                <h1 class="text-3xl font-bold text-gray-800">Manage Employees</h1>
+                <p class="text-gray-500">Total Employees: <span class="font-semibold text-blue-600"><?php echo $total_branches; ?></span></p>
             </div>
             <button id="addBranchBtn" class="flex items-center gap-2 bg-blue-600 text-white font-semibold py-2 px-4 rounded-lg shadow-md hover:bg-blue-700 transition duration-300">
                 <i data-lucide="plus-circle" class="w-5 h-5"></i>
@@ -118,7 +118,7 @@ $total_branches = $result->num_rows;
                     <thead class="text-xs text-gray-700 uppercase bg-gray-50">
                         <tr>
                             <th scope="col" class="px-6 py-3">S.No</th>
-                            <th scope="col" class="px-6 py-3">Branch Name</th>
+                            <th scope="col" class="px-6 py-3">Employee Name</th>
                             <th scope="col" class="px-6 py-3">Username</th>
                             <th scope="col" class="px-6 py-3">Email</th>
                             <th scope="col" class="px-6 py-3">Phone</th>

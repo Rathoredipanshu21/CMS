@@ -192,6 +192,18 @@ if (!isset($_SESSION['admin'])) {
                         <i class="fas fa-users"></i><span class="link-text">Manage Customers</span>
                     </a>
                 </li>
+
+                <li>
+                    <a href="cash_denomination.php" class="sidebar-link" target="content-frame">
+                        <i class="fas fa-coins"></i><span class="link-text">Cash Denomination</span>
+                    </a>
+                </li>
+                <li>
+                    <a href="cash_deposit_page.php" class="sidebar-link" target="content-frame">
+                        <i class="fas fa-coins"></i><span class="link-text">Cash Deposit</span>
+                    </a>
+                </li>
+
                 <li>
                     <a href="cash_demo.php" class="sidebar-link" target="content-frame">
                         <i class="fas fa-money-bill-transfer"></i><span class="link-text">New Transaction</span>
@@ -208,8 +220,13 @@ if (!isset($_SESSION['admin'])) {
                     </a>
                 </li>
                 <li>
+                    <a href="UTR_management.php" class="sidebar-link" target="content-frame">
+                        <i class="fas fa-hand-holding-usd"></i><span class="link-text">UTR Management</span>
+                    </a>
+                </li>
+                <li>
                     <a href="create_branch.php" class="sidebar-link" target="content-frame">
-                        <i class="fas fa-plus"></i><span class="link-text">Create Branch</span>
+                        <i class="fas fa-plus"></i><span class="link-text">Create Employee</span>
                     </a>
                 </li>
                 <li>
@@ -223,18 +240,24 @@ if (!isset($_SESSION['admin'])) {
                     </a>
                 </li>
                 <li>
-                    <a href="bank_deposits.php" class="sidebar-link" target="content-frame">
-                        <i class="fas fa-piggy-bank"></i><span class="link-text">Bank Deposits</span>
+                    <a href="balances.php" class="sidebar-link" target="content-frame">
+                    <i class="fa-solid fa-file-invoice-dollar"></i><span class="link-text">Account Ledger</span>
                     </a>
                 </li>
+              
                 <li>
                     <a href="manage_pages.php" class="sidebar-link" target="content-frame">
-                        <i class="fas fa-file-alt"></i><span class="link-text">Manage Branch Pages</span>
+                        <i class="fas fa-file-alt"></i><span class="link-text">Manage Employee Pages</span>
                     </a>
                 </li>
                 <li>
                     <a href="customer_search.php" class="sidebar-link" target="content-frame">
                         <i class="fas fa-search"></i><span class="link-text">Customer Lookup</span>
+                    </a>
+                </li>
+                <li>
+                    <a href="expenses.php" class="sidebar-link" target="content-frame">
+                        <i class="fas fa-search"></i><span class="link-text">Expenses</span>
                     </a>
                 </li>
                  <li>

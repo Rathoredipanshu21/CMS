@@ -9,13 +9,13 @@ if (!isset($_SESSION['branch_user']) || !isset($_SESSION['branch_id'])) {
 
 $message = '';
 $error = '';
-$display_uid = ''; 
+$display_uid = '';
 $companies = [];
 
 // --- Database Connection ---
-include '../config/db.php'; 
+include '../config/db.php';
 
-// --- CORRECTED: Fetch Logged-in User's Branch Name AND Username from DB ---
+// --- Fetch Logged-in User's Branch Name AND Username from DB ---
 $branch_name_from_db = 'N/A';
 $username_from_db = 'N/A'; // Variable to hold the username from the database
 
@@ -34,7 +34,7 @@ if ($conn) {
     }
 }
 
-// Fetch Companies for Dropdown
+// --- Fetch Companies for Dropdown ---
 if ($conn && !$conn->connect_error) {
     $company_result = $conn->query("SELECT id, company_name FROM company_commissions ORDER BY company_name ASC");
     if ($company_result && $company_result->num_rows > 0) {
@@ -73,7 +73,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             $numeric_part = (int) substr($last_uid, -3);
             $new_numeric_part = $numeric_part + 1;
             $customer_uid = 'DBCE-CMS-' . str_pad($new_numeric_part, 3, '0', STR_PAD_LEFT);
-            
+
             // --- Validate Mobile Number ---
             $mobile_no = $_POST['mobile_no'];
             if (!preg_match('/^[0-9]{10}$/', $mobile_no)) {
@@ -81,11 +81,12 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             }
 
             // --- Insert into `customers` table ---
+            // ## FIX 1: The SQL statement now uses `company_id` instead of `company_name`
             $stmt_customer = $conn->prepare(
-                "INSERT INTO customers (customer_uid, name, father_name, email, mobile_no, company_name, employee_id, photo_path, created_by_branch, created_by_user) 
+                "INSERT INTO customers (customer_uid, name, father_name, email, mobile_no, company_id, employee_id, photo_path, created_by_branch, created_by_user)
                  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
             );
-            
+
             if ($stmt_customer === false) {
                 throw new Exception("Failed to prepare the customer insert statement. DB Error: " . $conn->error);
             }
@@ -93,7 +94,8 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             $name = $_POST['name'];
             $father_name = $_POST['father_name'];
             $email = $_POST['email'];
-            $company_name = $_POST['company_name'];
+            // ## FIX 2: Get `company_id` from the form. Handle the optional (NULL) case.
+            $company_id = !empty($_POST['company_id']) ? (int)$_POST['company_id'] : NULL;
             $employee_id = $_POST['employee_id'];
             $photo_path = '';
 
@@ -116,7 +118,8 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                 }
             }
 
-            $stmt_customer->bind_param("ssssssssss", $customer_uid, $name, $father_name, $email, $mobile_no, $company_name, $employee_id, $photo_path, $created_by_branch, $created_by_user);
+            // ## FIX 3: Updated bind_param with 'i' for integer and using the correct $company_id variable
+            $stmt_customer->bind_param("sssssissss", $customer_uid, $name, $father_name, $email, $mobile_no, $company_id, $employee_id, $photo_path, $created_by_branch, $created_by_user);
             if (!$stmt_customer->execute()) {
                 throw new Exception("Error creating customer record: " . $stmt_customer->error);
             }
@@ -233,7 +236,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                             <input type="text" id="customer_uid" name="customer_uid_display" class="form-input" value="<?php echo $display_uid; ?>" readonly placeholder="Generated after submission">
                         </div>
                     </div>
-                    
+
                     <div>
                         <label for="name" class="block text-gray-700 font-medium mb-2">Name <span class="text-red-500 font-bold">*</span></label>
                         <div class="form-input-group"><i class="fas fa-user form-input-icon"></i><input type="text" id="name" name="name" class="form-input" placeholder="Enter full Name" required></div>
@@ -255,13 +258,13 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                     </div>
 
                     <div>
-                        <label for="company_name" class="block text-gray-700 font-medium mb-2">Company Name</label>
+                        <label for="company_id" class="block text-gray-700 font-medium mb-2">Company Name</label>
                         <div class="form-input-group">
                             <i class="fas fa-building form-input-icon"></i>
-                            <select id="company_name" name="company_name" class="form-select">
+                            <select id="company_id" name="company_id" class="form-select">
                                 <option value="">Select a Company (Optional)</option>
                                 <?php foreach ($companies as $company): ?>
-                                    <option value="<?php echo htmlspecialchars($company['company_name']); ?>">
+                                    <option value="<?php echo htmlspecialchars($company['id']); ?>">
                                         <?php echo htmlspecialchars($company['company_name']); ?>
                                     </option>
                                 <?php endforeach; ?>
@@ -293,7 +296,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                     </div>
                     <div id="documents-container" class="space-y-6"></div>
                 </div>
-                
+
                 <div class="mt-8 flex justify-end space-x-4 border-t pt-6">
                     <button type="submit" class="btn btn-submit"><i class="fas fa-check mr-2"></i>Submit</button>
                     <button type="button" class="btn bg-red-500 hover:bg-red-600" onclick="window.history.back()"><i class="fas fa-times mr-2"></i>Cancel</button>

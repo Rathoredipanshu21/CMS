@@ -116,13 +116,13 @@ if ($conn && !$conn->connect_error) {
                 $customers_with_transactions[$customer_id] = [
                     'customer_name'   => htmlspecialchars($row['customer_name']),
                     'customer_mobile' => htmlspecialchars($row['customer_mobile']),
-                    'total_amount'    => 0, // NEW: Initialize total amount
+                    'total_amount'    => 0, // Initialize total amount
                     'transactions'    => []
                 ];
             }
 
             if (!isset($customers_with_transactions[$customer_id]['transactions'][$tx_id])) {
-                 // NEW: Add grand_total to the customer's total amount for each new transaction
+                 // Add grand_total to the customer's total amount for each new transaction
                  $customers_with_transactions[$customer_id]['total_amount'] += (float)$row['grand_total'];
 
                  $customers_with_transactions[$customer_id]['transactions'][$tx_id] = [
@@ -135,7 +135,7 @@ if ($conn && !$conn->connect_error) {
                     'dues_amount'         => (float)$row['dues_amount'],
                     'advance_amount'      => (float)$row['advance_amount'],
                     'transaction_date'    => (new DateTime($row['transaction_date']))->format('d M Y, h:i A'),
-                    'raw_date'            => (new DateTime($row['transaction_date']))->format('Y-m-d'), // NEW: Add raw date for filtering
+                    'raw_date'            => (new DateTime($row['transaction_date']))->format('Y-m-d'), // Add raw date for filtering
                     'bank_name'           => $row['bank_name'] ? htmlspecialchars($row['bank_name']) : null,
                     'deposit_amount'      => $row['deposit_amount'] ? (float)$row['deposit_amount'] : null,
                     'bank_transaction_id' => $row['bank_transaction_id'] ? htmlspecialchars($row['bank_transaction_id']) : 'N/A',
@@ -202,13 +202,8 @@ function format_inr($amount) {
         .toast.show { opacity: 1; bottom: 40px; }
         .toast.success { background-color: #28a745; }
         .toast.error { background-color: #dc3545; }
-        /* Style for date input clear button */
-        input[type="date"]::-webkit-calendar-picker-indicator {
-            cursor: pointer;
-        }
-        input[type="date"]::-webkit-clear-button {
-            display: none;
-        }
+        input[type="date"]::-webkit-calendar-picker-indicator { cursor: pointer; }
+        input[type="date"]::-webkit-clear-button { display: none; }
     </style>
 </head>
 <body class="p-4 sm:p-6 lg:p-8">
@@ -219,9 +214,9 @@ function format_inr($amount) {
         <p class="text-lg text-gray-500 mt-2">A complete record of all transactions, grouped by customer.</p>
     </header>
 
-    <!-- UPDATED: FILTER SECTION -->
+    <!-- UPDATED: FILTER SECTION WITH DATE RANGE -->
     <div class="mb-6 bg-white p-4 rounded-xl shadow-md" data-aos="fade-up">
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
             <!-- Name Filter -->
             <div class="relative md:col-span-1">
                 <label for="filter-name" class="block text-sm font-medium text-gray-700 mb-1">Filter by Name</label>
@@ -230,18 +225,26 @@ function format_inr($amount) {
                     <input type="text" id="filter-name" placeholder="Search for a customer..." class="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500">
                 </div>
             </div>
-            <!-- Date Filter -->
+            <!-- Start Date Filter -->
             <div class="relative md:col-span-1">
-                <label for="filter-date" class="block text-sm font-medium text-gray-700 mb-1">Filter by Date</label>
+                <label for="filter-start-date" class="block text-sm font-medium text-gray-700 mb-1">From Date</label>
                 <div class="relative">
                     <i class="fas fa-calendar-alt absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"></i>
-                    <input type="date" id="filter-date" class="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500">
+                    <input type="date" id="filter-start-date" class="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500">
+                </div>
+            </div>
+            <!-- End Date Filter -->
+            <div class="relative md:col-span-1">
+                <label for="filter-end-date" class="block text-sm font-medium text-gray-700 mb-1">To Date</label>
+                <div class="relative">
+                    <i class="fas fa-calendar-alt absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"></i>
+                    <input type="date" id="filter-end-date" class="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500">
                 </div>
             </div>
             <!-- Search Button -->
             <div class="md:col-span-1 flex items-end">
                 <button id="search-btn" class="w-full bg-blue-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors duration-200 flex items-center justify-center">
-                    <i class="fas fa-search mr-2"></i> Search
+                    <i class="fas fa-search mr-2"></i> Filter
                 </button>
             </div>
         </div>
@@ -268,7 +271,6 @@ function format_inr($amount) {
                         </div>
                         <!-- Right Side: Total Amount & Accordion Icon -->
                         <div class="flex items-center">
-                            <!-- NEW: TOTAL AMOUNT DISPLAY -->
                             <div class="text-right mr-4">
                                 <p class="text-sm text-gray-500">Total</p>
                                 <p class="font-bold text-lg text-green-600"><?php echo format_inr($customer['total_amount']); ?></p>
@@ -281,7 +283,6 @@ function format_inr($amount) {
                             <h3 class="text-md font-semibold text-gray-700 mb-3 px-1">Transactions:</h3>
                             <ul class="space-y-3">
                                 <?php foreach ($customer['transactions'] as $tx): ?>
-                                <!-- NEW: Added data-date attribute for JS filtering -->
                                 <li class="transaction-entry bg-white p-3 rounded-lg shadow-sm flex flex-col sm:flex-row justify-between items-start sm:items-center" data-date="<?php echo $tx['raw_date']; ?>">
                                     <div>
                                         <p class="font-semibold text-gray-700"><?php echo $tx['company_name']; ?></p>
@@ -305,7 +306,6 @@ function format_inr($amount) {
                 <?php endforeach; ?>
             </div>
         </div>
-        <!-- NEW: NO RESULTS MESSAGE -->
         <div id="no-results" class="text-center py-16 hidden" data-aos="fade-up">
             <i class="fas fa-search text-7xl text-gray-300"></i>
             <h2 class="mt-4 text-2xl font-semibold text-gray-700">No Matching Transactions Found</h2>
@@ -331,7 +331,6 @@ function format_inr($amount) {
             const icon = button.querySelector('i.fa-chevron-down');
             const isOpen = button.parentElement.classList.contains('is-open');
 
-            // Close all other accordions
             document.querySelectorAll('.accordion-item.is-open').forEach(openItem => {
                 if (openItem !== button.parentElement) {
                     openItem.classList.remove('is-open');
@@ -342,7 +341,6 @@ function format_inr($amount) {
                 }
             });
 
-            // Toggle current accordion
             if (!isOpen) {
                 button.parentElement.classList.add('is-open');
                 icon.classList.add('rotate-180');
@@ -380,15 +378,11 @@ function format_inr($amount) {
         }, 10);
     }
 
-    // --- MODAL AND DETAILS LOGIC (using event delegation) ---
-    // This listener is on the main list container. It will catch clicks on any 'View Details' button inside it.
+    // --- MODAL AND DETAILS LOGIC ---
     if (transactionListContainer) {
         transactionListContainer.addEventListener('click', function(e) {
-            // Find the closest '.view-details-btn' that was clicked
             const viewDetailsButton = e.target.closest('.view-details-btn');
-            if (!viewDetailsButton) {
-                return; // Exit if the click was not on a details button
-            }
+            if (!viewDetailsButton) return;
 
             const txData = JSON.parse(viewDetailsButton.dataset.transaction);
             
@@ -408,12 +402,11 @@ function format_inr($amount) {
                 bankDetailsHtml = `<div class="border-t border-gray-200 pt-4"><h4 class="text-md font-semibold text-gray-700 mb-3">Bank Deposit</h4><div class="bg-blue-50 p-3 rounded-lg border border-blue-200"><div class="flex justify-between items-center"><span class="font-semibold text-gray-700"><i class="fas fa-university mr-2 text-blue-500"></i>${txData.bank_name}</span><span class="font-bold text-lg text-blue-800">${formatINR(txData.deposit_amount)}</span></div><div class="text-xs text-gray-500 mt-2 font-mono flex items-center justify-between" data-tx-id="${txData.transaction_id}"><div class="flex items-center"><span>Txn ID: </span><span class="bank-txn-id-text ml-2 font-semibold text-gray-700">${txData.bank_transaction_id}</span><input type="text" class="bank-txn-id-input form-input text-xs p-1 ml-2 hidden w-48 border rounded" value="${bankTxnIdValue}"></div><div><button class="edit-txn-id-btn text-blue-600 hover:text-blue-800"><i class="fas fa-pencil-alt"></i></button><button class="save-txn-id-btn text-green-600 hover:text-green-800 hidden ml-2"><i class="fas fa-check"></i></button></div></div></div></div>`;
             }
 
-            modalContent.innerHTML = `<div class="p-5 sm:p-6 border-b border-gray-200 bg-gray-50 rounded-t-2xl flex justify-between items-center sticky top-0 z-10"><div><h3 class="text-2xl font-bold text-gray-800">${txData.company_name}</h3><p class="text-sm text-gray-500">${txData.transaction_date}</p></div><button id="close-modal-btn" class="text-gray-400 hover:text-gray-600 transition-colors"><i class="fas fa-times fa-2x"></i></button></div><div class="p-5 sm:p-6 space-y-6"><div class="grid grid-cols-2 sm:grid-cols-3 gap-4 text-center"><div class="bg-gray-100 p-3 rounded-lg"><p class="text-xs text-gray-500 font-semibold uppercase">Grand Total</p><p class="text-lg font-bold text-gray-800">${formatINR(txData.grand_total)}</p></div><div class="bg-green-100 p-3 rounded-lg"><p class="text-xs text-green-600 font-semibold uppercase">Paid Amount</p><p class="text-lg font-bold text-green-800">${formatINR(txData.actual_paid_amount)}</p></div><div class="bg-purple-100 p-3 rounded-lg"><p class="text-xs text-purple-600 font-semibold uppercase">Commission</p><p class="text-lg font-bold text-purple-800">${formatINR(txData.commission_amount)}</p></div><div class="bg-red-100 p-3 rounded-lg col-span-1 sm:col-span-1"><p class="text-xs text-red-600 font-semibold uppercase">Dues</p><p class="text-lg font-bold text-red-800">${formatINR(txData.dues_amount)}</p></div><div class="bg-indigo-100 p-3 rounded-lg col-span-2 sm:col-span-2"><p class="text-xs text-indigo-600 font-semibold uppercase">Advance</p><p class="text-lg font-bold text-indigo-800">${formatINR(txData.advance_amount)}</p></div></div>${(cashDetailsHtml || onlineDetailsHtml) ? `<div class="border-t border-gray-200 pt-4"><h4 class="text-md font-semibold text-gray-700 mb-3">Payment Breakdown</h4><div class="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4"><div>${cashDetailsHtml}</div><div>${onlineDetailsHtml}</div></div></div>` : ''}${bankDetailsHtml}</div>`;
+            modalContent.innerHTML = `<div class="p-5 sm:p-6 border-b border-gray-200 bg-gray-50 rounded-t-2xl flex justify-between items-center sticky top-0 z-10"><div><h3 class="text-2xl font-bold text-gray-800">${txData.company_name}</h3><p class="text-sm text-gray-500">${txData.transaction_date}</p></div><button id="close-modal-btn" class="text-gray-400 hover:text-gray-600 transition-colors"><i class="fas fa-times fa-2x"></i></button></div><div class="p-5 sm:p-6 space-y-6"><div class="grid grid-cols-2 sm:grid-cols-3 gap-4 text-center"><div class="bg-gray-100 p-3 rounded-lg"><p class="text-xs text-gray-500 font-semibold uppercase">Grand Total</p><p class="text-lg font-bold text-gray-800">${formatINR(txData.grand_total)}</p></div><div class="bg-green-100 p-3 rounded-lg"><p class="text-xs text-green-600 font-semibold uppercase">Paid Amount</p><p class="text-lg font-bold text-green-800">${formatINR(txData.actual_paid_amount)}</p></div><div class="bg-purple-100 p-3 rounded-lg"><p class="text-xs text-purple-600 font-semibold uppercase">Commission</p><p class="text-lg font-bold text-purple-800">${formatINR(txData.commission_amount)}</p></div><div class="bg-red-100 p-3 rounded-lg col-span-1 sm:col-span-1"><p class="text-xs text-red-600 font-semibold uppercase">Advance</p><p class="text-lg font-bold text-red-800">${formatINR(txData.dues_amount)}</p></div><div class="bg-indigo-100 p-3 rounded-lg col-span-2 sm:col-span-2"><p class="text-xs text-indigo-600 font-semibold uppercase">Dues</p><p class="text-lg font-bold text-indigo-800">${formatINR(txData.advance_amount)}</p></div></div>${(cashDetailsHtml || onlineDetailsHtml) ? `<div class="border-t border-gray-200 pt-4"><h4 class="text-md font-semibold text-gray-700 mb-3">Payment Breakdown</h4><div class="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4"><div>${cashDetailsHtml}</div><div>${onlineDetailsHtml}</div></div></div>` : ''}${bankDetailsHtml}</div>`;
             modal.classList.remove('hidden');
             setTimeout(() => { modal.classList.remove('opacity-0'); modalContent.classList.remove('scale-95'); }, 10);
         });
     }
-
 
     function closeModal() {
         modal.classList.add('opacity-0');
@@ -441,24 +434,17 @@ function format_inr($amount) {
             const inputField = container.querySelector('.bank-txn-id-input');
             const newTxnId = inputField.value;
             
-            // Post back to the same file.
             fetch(window.location.href, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
                 body: `action=update_bank_txn_id&transaction_id=${encodeURIComponent(transactionId)}&bank_transaction_id=${encodeURIComponent(newTxnId)}`
             })
-            .then(response => {
-                if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
-                }
-                return response.json();
-            })
+            .then(response => response.json())
             .then(data => {
                 if (data.success) {
                     const newIdText = newTxnId || 'N/A';
                     container.querySelector('.bank-txn-id-text').textContent = newIdText;
                     
-                    // Also update the original button's data attribute to persist the change without a page reload
                     const mainButton = document.querySelector(`.view-details-btn[data-transaction*='"transaction_id":${transactionId}']`);
                     if (mainButton) {
                         const txData = JSON.parse(mainButton.dataset.transaction);
@@ -473,7 +459,6 @@ function format_inr($amount) {
                     showToast('Transaction ID updated successfully!');
                 } else {
                     showToast(data.error || 'Error updating Transaction ID.', 'error');
-                    console.error('Update failed:', data.error);
                 }
             })
             .catch(error => {
@@ -485,16 +470,18 @@ function format_inr($amount) {
 
     document.addEventListener('keydown', (e) => { if (e.key === "Escape" && !modal.classList.contains('hidden')) closeModal(); });
 
-    // --- UPDATED: FILTERING LOGIC ---
+    // --- UPDATED: FILTERING LOGIC WITH DATE RANGE ---
     const nameFilter = document.getElementById('filter-name');
-    const dateFilter = document.getElementById('filter-date');
+    const startDateFilter = document.getElementById('filter-start-date');
+    const endDateFilter = document.getElementById('filter-end-date');
     const searchBtn = document.getElementById('search-btn');
     const noResultsMessage = document.getElementById('no-results');
     const accordionItems = document.querySelectorAll('.accordion-item');
 
     function applyFilters() {
         const nameQuery = nameFilter.value.toLowerCase().trim();
-        const dateQuery = dateFilter.value;
+        const startDateQuery = startDateFilter.value;
+        const endDateQuery = endDateFilter.value;
         let visibleCustomers = 0;
 
         accordionItems.forEach(customerDiv => {
@@ -505,8 +492,20 @@ function format_inr($amount) {
             const transactions = customerDiv.querySelectorAll('.transaction-entry');
             transactions.forEach(txLi => {
                 const txDate = txLi.dataset.date;
-                // A transaction is visible if date filter is empty OR the date matches
-                if (!dateQuery || txDate === dateQuery) {
+                
+                // Check if the transaction date falls within the selected range
+                let dateMatch = false;
+                if (!startDateQuery && !endDateQuery) {
+                    dateMatch = true; // No date filter applied
+                } else if (startDateQuery && !endDateQuery) {
+                    dateMatch = txDate >= startDateQuery;
+                } else if (!startDateQuery && endDateQuery) {
+                    dateMatch = txDate <= endDateQuery;
+                } else {
+                    dateMatch = txDate >= startDateQuery && txDate <= endDateQuery;
+                }
+
+                if (dateMatch) {
                     txLi.style.display = 'flex';
                     visibleTransactions++;
                 } else {
@@ -535,15 +534,18 @@ function format_inr($amount) {
 
     // Live search for name
     nameFilter.addEventListener('input', applyFilters);
-    // Search on button click for date
+    
+    // Search on button click for all filters
     searchBtn.addEventListener('click', applyFilters);
-    // Also filter if the user clears the date input
-    dateFilter.addEventListener('input', () => {
-        if (dateFilter.value === '') {
-            applyFilters();
-        }
+    
+    // Also filter if the user clears a date input
+    [startDateFilter, endDateFilter].forEach(input => {
+        input.addEventListener('input', () => {
+            if (input.value === '') {
+                applyFilters();
+            }
+        });
     });
-
 
 </script>
 

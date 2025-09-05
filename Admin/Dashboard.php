@@ -4,9 +4,9 @@ include '../config/db.php';
 
 // --- (1) FETCH STATISTICS CARDS DATA ---
 
-// Total Revenue
+// Total Revenue (Commission)
 $total_revenue = 0; // Default value
-$revenue_result = $conn->query("SELECT SUM(final_payable_amount) as total FROM transactions");
+$revenue_result = $conn->query("SELECT SUM(commission_amount) as total FROM transactions");
 if ($revenue_result) {
     $total_revenue = $revenue_result->fetch_assoc()['total'] ?? 0;
 }
@@ -32,13 +32,21 @@ if ($companies_result) {
     $total_companies = $companies_result->fetch_assoc()['total'] ?? 0;
 }
 
+// NEW: Total Transacted Amount
+$total_transacted_amount = 0; // Default value
+$transacted_result = $conn->query("SELECT SUM(actual_paid_amount) as total FROM transactions");
+if ($transacted_result) {
+    $total_transacted_amount = $transacted_result->fetch_assoc()['total'] ?? 0;
+}
+
 
 // --- (2) FETCH CHART DATA ---
 
 // A. Monthly Revenue (Bar Chart)
 $monthly_revenue_data = array_fill(0, 12, 0);
 $current_year = date('Y');
-$monthly_sql = "SELECT MONTH(transaction_date) as month, SUM(final_payable_amount) as total FROM transactions WHERE YEAR(transaction_date) = ? GROUP BY MONTH(transaction_date)";
+// NOTE: This chart still shows total transaction amounts, not commission.
+$monthly_sql = "SELECT MONTH(transaction_date) as month, SUM(actual_paid_amount) as total FROM transactions WHERE YEAR(transaction_date) = ? GROUP BY MONTH(transaction_date)";
 $stmt_monthly = $conn->prepare($monthly_sql);
 if ($stmt_monthly) {
     $stmt_monthly->bind_param("i", $current_year);
@@ -55,13 +63,18 @@ if ($stmt_monthly) {
 // B. Payment Mode Distribution (Doughnut Chart)
 $cash_total = 0;
 $online_total = 0;
-$payment_mode_sql = "SELECT SUM(total_cash_amount) as total_cash, SUM(total_online_amount) as total_online FROM transactions";
+$payment_mode_sql = "SELECT SUM(t.amount) as total_amount, td.detail_type FROM transactions t JOIN transaction_details td ON t.id = td.transaction_id WHERE td.detail_type IN ('cash', 'online') GROUP BY td.detail_type";
 $payment_mode_result = $conn->query($payment_mode_sql);
 if ($payment_mode_result) {
-    $payment_mode_data = $payment_mode_result->fetch_assoc();
-    $cash_total = $payment_mode_data['total_cash'] ?? 0;
-    $online_total = $payment_mode_data['total_online'] ?? 0;
+    while($row = $payment_mode_result->fetch_assoc()){
+        if ($row['detail_type'] == 'cash') {
+            $cash_total = $row['total_amount'] ?? 0;
+        } else if ($row['detail_type'] == 'online') {
+            $online_total = $row['total_amount'] ?? 0;
+        }
+    }
 }
+
 
 // C. Top Performing Companies (Horizontal Bar Chart)
 $top_companies_labels = [];
@@ -78,7 +91,7 @@ if ($top_companies_result) {
 
 // --- (3) FETCH RECENT ACTIVITY ---
 $recent_transactions_sql = "
-    SELECT t.final_payable_amount, t.transaction_date, c.name as customer_name 
+    SELECT t.actual_paid_amount, t.transaction_date, c.name as customer_name 
     FROM transactions t 
     JOIN customers c ON t.customer_id = c.id
     ORDER BY t.id DESC 
@@ -121,23 +134,28 @@ $conn->close();
             <p class="mt-2 text-lg text-gray-500">Welcome back! Here's your business overview.</p>
         </div>
 
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-6 mb-8">
             <div class="stat-card border-l-8 border-green-500" data-aos="fade-up" data-aos-delay="100">
                 <i class="fas fa-wallet fa-3x absolute -right-2 -bottom-2 text-green-500 opacity-70"></i>
                 <p class="text-sm font-medium text-gray-500">Total Revenue</p>
                 <p class="text-4xl font-bold text-gray-900 mt-1">₹<?php echo number_format($total_revenue, 0); ?></p>
             </div>
-            <div class="stat-card border-l-8 border-blue-500" data-aos="fade-up" data-aos-delay="200">
+            <div class="stat-card border-l-8 border-cyan-500" data-aos="fade-up" data-aos-delay="200">
+                <i class="fas fa-exchange-alt fa-3x absolute -right-2 -bottom-2 text-cyan-500 opacity-70"></i>
+                <p class="text-sm font-medium text-gray-500">Total Transacted</p>
+                <p class="text-4xl font-bold text-gray-900 mt-1">₹<?php echo number_format($total_transacted_amount, 0); ?></p>
+            </div>
+            <div class="stat-card border-l-8 border-blue-500" data-aos="fade-up" data-aos-delay="300">
                 <i class="fas fa-users fa-3x absolute -right-2 -bottom-2 text-blue-500 opacity-70"></i>
                 <p class="text-sm font-medium text-gray-500">Total Customers</p>
                 <p class="text-4xl font-bold text-gray-900 mt-1"><?php echo $total_customers; ?></p>
             </div>
-            <div class="stat-card border-l-8 border-purple-500" data-aos="fade-up" data-aos-delay="300">
+            <div class="stat-card border-l-8 border-purple-500" data-aos="fade-up" data-aos-delay="400">
                 <i class="fas fa-receipt fa-3x absolute -right-2 -bottom-2 text-purple-500 opacity-70"></i>
                 <p class="text-sm font-medium text-gray-500">Total Transactions</p>
                 <p class="text-4xl font-bold text-gray-900 mt-1"><?php echo $total_transactions; ?></p>
             </div>
-            <div class="stat-card border-l-8 border-orange-500" data-aos="fade-up" data-aos-delay="400">
+            <div class="stat-card border-l-8 border-orange-500" data-aos="fade-up" data-aos-delay="500">
                 <i class="fas fa-building fa-3x absolute -right-2 -bottom-2 text-orange-500 opacity-70"></i>
                 <p class="text-sm font-medium text-gray-500">Total Companies</p>
                 <p class="text-4xl font-bold text-gray-900 mt-1"><?php echo $total_companies; ?></p>
@@ -172,7 +190,7 @@ $conn->close();
                                     <td class="py-4 px-2"><div class="p-3 rounded-full bg-green-100"><i class="fas fa-check text-green-600"></i></div></td>
                                     <td class="py-4 px-2"><p class="font-semibold text-gray-800"><?php echo htmlspecialchars($row['customer_name']); ?></p></td>
                                     <td class="py-4 px-2"><p class="text-sm text-gray-500">made a payment.</p></td>
-                                    <td class="py-4 px-2 text-right"><p class="font-bold text-gray-800">₹<?php echo number_format($row['final_payable_amount'], 0); ?></p></td>
+                                    <td class="py-4 px-2 text-right"><p class="font-bold text-gray-800">₹<?php echo number_format($row['actual_paid_amount'], 0); ?></p></td>
                                     <td class="py-4 px-2 text-right"><p class="text-sm text-gray-500"><?php echo date("d M, Y", strtotime($row['transaction_date'])); ?></p></td>
                                 </tr>
                             <?php endwhile; ?>

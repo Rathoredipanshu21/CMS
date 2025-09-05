@@ -49,7 +49,7 @@ if (!empty($sidebar_pages)) {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Branch Dashboard</title>
+    <title>Employee Dashboard</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -70,7 +70,7 @@ if (!empty($sidebar_pages)) {
 <body class="flex h-screen">
     <aside id="sidebar" class="sidebar w-64 flex-shrink-0 p-4 flex flex-col text-white shadow-lg">
         <div class="sidebar-header flex items-center justify-start py-3 mb-4">
-            <a href="#" class="flex items-center text-2xl font-bold"><i class="fas fa-university mr-3 text-3xl text-blue-400"></i><span>Branch Portal</span></a>
+            <a href="#" class="flex items-center text-2xl font-bold"><i class="fas fa-university mr-3 text-3xl text-blue-400"></i><span>Employee Portal</span></a>
         </div>
         <div class="user-welcome p-3 mb-4 rounded-lg bg-slate-700/50">
             <p class="text-slate-400 text-sm">Welcome,</p>

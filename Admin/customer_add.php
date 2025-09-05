@@ -23,7 +23,6 @@ if ($conn->connect_error) {
 
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
     // The include is already there, but let's ensure connection is still valid
-    // This part of the logic remains largely the same
     if (!$conn || $conn->connect_error) {
         $error = "Database connection has been lost.";
     } else {
@@ -47,18 +46,20 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                 throw new Exception("Mobile number must be exactly 10 digits.");
             }
 
-            // --- Insert into `customers` table ---
-            $stmt_customer = $conn->prepare("INSERT INTO customers (customer_uid, name, father_name, email, mobile_no, company_name, employee_id, photo_path) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
+            // --- Prepare Insert into `customers` table ---
+            // The SQL query now uses `company_id` instead of `company_name`
+            $stmt_customer = $conn->prepare("INSERT INTO customers (customer_uid, name, father_name, email, mobile_no, company_id, employee_id, photo_path) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
             
             if ($stmt_customer === false) {
-                throw new Exception("Failed to prepare the customer insert statement. Please ensure the 'customers' table has a 'customer_uid' column. DB Error: " . $conn->error);
+                throw new Exception("Failed to prepare the customer insert statement. DB Error: " . $conn->error);
             }
 
             // Initialize variables from POST data
             $name = $_POST['name'];
             $father_name = $_POST['father_name'];
             $email = $_POST['email'];
-            $company_name = $_POST['company_name']; // This will now come from the dropdown
+            // Get the company_id. If it's empty, set it to NULL.
+            $company_id = !empty($_POST['company_id']) ? (int)$_POST['company_id'] : null;
             $employee_id = $_POST['employee_id'];
             $photo_path = ''; // Will be updated after file move
 
@@ -82,7 +83,11 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                 }
             }
 
-            $stmt_customer->bind_param("ssssssss", $customer_uid, $name, $father_name, $email, $mobile_no, $company_name, $employee_id, $photo_path);
+            // Bind parameters. Note the type for company_id is 'i' (integer).
+            // The order and types must match the SQL statement.
+            // s: string, i: integer
+            $stmt_customer->bind_param("ssssisss", $customer_uid, $name, $father_name, $email, $mobile_no, $company_id, $employee_id, $photo_path);
+            
             if (!$stmt_customer->execute()) {
                 if ($conn->errno == 1062) {
                      throw new Exception("A customer with a similar unique ID already exists. Please try submitting again.");
@@ -127,7 +132,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                         $stmt_doc = $conn->prepare("INSERT INTO customer_documents (customer_id, document_type, document_number, document_image_path) VALUES (?, ?, ?, ?)");
                         
                         if ($stmt_doc === false) {
-                            throw new Exception("Failed to prepare the document insert statement. Check table/column names. DB Error: " . $conn->error);
+                            throw new Exception("Failed to prepare the document insert statement. DB Error: " . $conn->error);
                         }
 
                         $stmt_doc->bind_param("isss", $customer_id, $type, $number, $doc_target_file);
@@ -226,9 +231,9 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                     <div>
                         <label for="mobile_no" class="block text-gray-700 font-medium mb-2">Mobile No <span class="required-star">*</span></label>
                         <div class="form-input-group">
-    <i class="fas fa-mobile-alt form-input-icon"></i>
-    <input type="tel" id="mobile_no" name="mobile_no" class="form-input" placeholder="Enter 10-digit number" required pattern="[0-9]{10}" maxlength="10" title="Mobile number must be exactly 10 digits.">
-</div>
+                            <i class="fas fa-mobile-alt form-input-icon"></i>
+                            <input type="tel" id="mobile_no" name="mobile_no" class="form-input" placeholder="Enter 10-digit number" required pattern="[0-9]{10}" maxlength="10" title="Mobile number must be exactly 10 digits.">
+                        </div>
                     </div>
                     <div>
                         <label for="father_name" class="block text-gray-700 font-medium mb-2">Father's Name</label>
@@ -240,13 +245,15 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                     </div>
 
                     <div>
-                        <label for="company_name" class="block text-gray-700 font-medium mb-2">Company Name</label>
+                        <label for="company_id" class="block text-gray-700 font-medium mb-2">Company Name</label>
                         <div class="form-input-group">
                             <i class="fas fa-building form-input-icon"></i>
-                            <select id="company_name" name="company_name" class="form-select">
+                            <!-- The name is now "company_id" -->
+                            <select id="company_id" name="company_id" class="form-select">
                                 <option value="">Select a Company (Optional)</option>
                                 <?php foreach ($companies as $company): ?>
-                                    <option value="<?php echo htmlspecialchars($company['company_name']); ?>">
+                                    <!-- The value is now the company's ID -->
+                                    <option value="<?php echo htmlspecialchars($company['id']); ?>">
                                         <?php echo htmlspecialchars($company['company_name']); ?>
                                     </option>
                                 <?php endforeach; ?>
@@ -308,6 +315,8 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     </div>
 
 <script>
+// The Javascript does not need any changes for this request.
+// It is included here to keep the file complete.
 document.addEventListener('DOMContentLoaded', function () {
     const addDocumentBtn = document.getElementById('add-document-btn');
     const documentsContainer = document.getElementById('documents-container');
