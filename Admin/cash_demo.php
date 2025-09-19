@@ -277,8 +277,8 @@ $cash_denominations = [500 => '../images/500.png', 200 => '../images/200.png', 1
                             <label for="actual_paid_amount" class="text-md font-semibold text-yellow-800">Actual Amount Paid by Customer</label>
                             <div class="relative mt-1"><span class="absolute left-3 top-1/2 -translate-y-1/2">₹</span><input type="number" step="0.01" id="actual_paid_amount" name="actual_paid_amount" class="form-input w-full text-center text-2xl font-bold pl-7" placeholder="0.00"></div>
                         </div>
-                         <div class="flex justify-between items-center bg-red-100 p-2 rounded-lg"><label class="text-sm font-semibold text-red-800">Advance (+)</label><input type="text" id="dues_amount_display" class="font-bold text-red-800 text-right bg-transparent border-none p-0 w-24" value="0.00" readonly></div>
-                         <div class="flex justify-between items-center bg-green-100 p-2 rounded-lg"><label class="text-sm font-semibold text-green-800">New Dues (-)</label><input type="text" id="advance_amount_display" class="font-bold text-green-800 text-right bg-transparent border-none p-0 w-24" value="0.00" readonly></div>
+                         <div class="flex justify-between items-center bg-green-100 p-2 rounded-lg"><label class="text-sm font-semibold text-green-800">Advance (+)</label><input type="text" id="dues_amount_display" class="font-bold text-green-800 text-right bg-transparent border-none p-0 w-24" value="0.00" readonly></div>
+                         <div class="flex justify-between items-center bg-red-100 p-2 rounded-lg"><label class="text-sm font-semibold text-red-800">New Dues (-)</label><input type="text" id="advance_amount_display" class="font-bold text-red-800 text-right bg-transparent border-none p-0 w-24" value="0.00" readonly></div>
                     </div>
                 </div>
 
